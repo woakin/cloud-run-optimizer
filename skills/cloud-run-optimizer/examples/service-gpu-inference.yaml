@@ -1,0 +1,61 @@
+# Optimized Cloud Run Service YAML — Profile F: GPU AI / ML Inference (NVIDIA L4)
+# Ideal for: vLLM, Ollama, Hugging Face TGI, PyTorch, Whisper, ComfyUI
+# Deploy with: gcloud run services replace service-gpu-inference.yaml --region=us-central1
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: ml-gpu-inference-service
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        # 1. GPU workloads require always-allocated CPU (no cpu throttling)
+        run.googleapis.com/cpu-throttling: "false"
+        # 2. Gen2 execution environment is mandatory for GPU workloads
+        run.googleapis.com/execution-environment: gen2
+        # 3. Specify NVIDIA L4 GPU accelerator
+        run.googleapis.com/gpu-type: nvidia-l4
+        # 4. Scale to zero when idle, cap max instances to control GPU cost
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "3"
+    spec:
+      # Keep concurrency conservative based on VRAM capacity (L4 has 24GB VRAM)
+      containerConcurrency: 8
+      timeoutSeconds: 600
+      serviceAccountName: ml-inference-sa@PROJECT_ID.iam.gserviceaccount.com
+      volumes:
+        # Mount Cloud Storage bucket containing model weights to avoid multi-GB container pulls
+        - name: model-weights
+          csi:
+            driver: gcsfuse.run.googleapis.com
+            volumeAttributes:
+              bucketName: my-model-weights-bucket
+              mountOptions: "implicit-dirs,file-cache:max-size-mb:10000"
+      containers:
+        - image: us-central1-docker.pkg.dev/PROJECT_ID/models/vllm-service:latest
+          ports:
+            - name: http1
+              containerPort: 8080
+          env:
+            - name: MODEL_PATH
+              value: "/mnt/models/my-llama-model"
+          resources:
+            limits:
+              cpu: "4"
+              memory: 16Gi
+              nvidia.com/gpu: "1"
+          volumeMounts:
+            - name: model-weights
+              mountPath: /mnt/models
+              readOnly: true
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 24

@@ -7,6 +7,7 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_DIR="${1:-.}"
 if [ ! -d "$TARGET_DIR" ]; then
   echo "Error: Directory '$TARGET_DIR' does not exist." >&2
@@ -23,7 +24,7 @@ echo "=================================================================="
 # 1. Detect Stack & Manifests
 # ------------------------------------------------------------------------------
 echo ""
-echo "[1/4] Detected Project Stack & Manifests:"
+echo "[1/5] Detected Project Stack & Manifests:"
 STACKS=()
 [ -f "package.json" ] && STACKS+=("Node.js/TypeScript (package.json)")
 [ -f "next.config.js" ] || [ -f "next.config.mjs" ] || [ -f "next.config.ts" ] && STACKS+=("Next.js")
@@ -46,7 +47,7 @@ fi
 # 2. Dockerfile Audit
 # ------------------------------------------------------------------------------
 echo ""
-echo "[2/4] Dockerfile & Container Build Audit:"
+echo "[2/5] Dockerfile & Container Build Audit:"
 if [ -f "Dockerfile" ]; then
   echo "  - Dockerfile: FOUND"
 
@@ -93,7 +94,7 @@ done
 # 3. Serverless Code Anti-Patterns Scan
 # ------------------------------------------------------------------------------
 echo ""
-echo "[3/4] Serverless Code Anti-Pattern Scan:"
+echo "[3/5] Serverless Code Anti-Pattern Scan:"
 
 EXCLUDE_DIRS=(
   --exclude-dir=node_modules
@@ -111,6 +112,7 @@ EXCLUDE_DIRS=(
   --exclude-dir=.claude
   --exclude="*.md"
   --exclude="audit-codebase.sh"
+  --exclude="evaluate-workload.py"
 )
 
 scan_pattern() {
@@ -168,7 +170,7 @@ fi
 # 4. Existing Cloud Run / IaC Config Scan
 # ------------------------------------------------------------------------------
 echo ""
-echo "[4/4] Infrastructure Configs (YAML / Terraform / scripts) Scan:"
+echo "[4/5] Infrastructure Configs (YAML / Terraform / scripts) Scan:"
 IAC_FILES=$(find . -maxdepth 3 \( -name "*.yaml" -o -name "*.yml" -o -name "*.tf" -o -name "cloudbuild*.yaml" \) \
   -not -path "*/node_modules/*" -not -path "*/.git/*" -not -path "*/.venv/*" 2>/dev/null || true)
 
@@ -194,7 +196,18 @@ else
   echo "  - No YAML or Terraform IaC files found in repository."
 fi
 
+# ------------------------------------------------------------------------------
+# 5. Workload Evaluation & Tailored Sizing
+# ------------------------------------------------------------------------------
+echo ""
+echo "[5/5] Workload Classification & Tailored Sizing Evaluation:"
+if command -v python3 >/dev/null 2>&1 && [ -f "$SCRIPT_DIR/evaluate-workload.py" ]; then
+  python3 "$SCRIPT_DIR/evaluate-workload.py" "$TARGET_DIR"
+else
+  echo "  - python3 or evaluate-workload.py not available. Run evaluate-workload.py manually."
+fi
+
 echo ""
 echo "=================================================================="
-echo " Audit Complete."
+echo " Static Audit & Evaluation Complete."
 echo "=================================================================="

@@ -132,3 +132,75 @@ USER nonroot:nonroot
 EXPOSE 8080
 ENTRYPOINT ["/server"]
 ```
+
+---
+
+### E. Java / JVM (Spring Boot / Quarkus on Cloud Run)
+
+* **cgroup Memory Ceilings:** The JVM may not detect container memory limits in older JDKs. Always specify `-XX:MaxRAMPercentage=75.0` to leave headroom for OS and non-heap memory.
+* **Startup JIT Optimization:** Enable CDS (Class Data Sharing) or spring AOT compilation (`native-image`) to slash startup time from 12s down to <1s.
+
+```dockerfile
+# Optimized Spring Boot Dockerfile for Cloud Run
+FROM eclipse-temurin:21-jdk-jammy AS build
+WORKDIR /workspace
+COPY mvnw pom.xml ./
+COPY .mvn .mvn
+RUN ./mvnw dependency:go-offline
+COPY src src
+RUN ./mvnw clean package -DskipTests
+
+FROM eclipse-temurin:21-jre-jammy AS runtime
+WORKDIR /app
+# Cap heap at 75% of container RAM and optimize for single-tenant container
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
+RUN useradd -m appuser
+USER appuser
+COPY --from=build /workspace/target/*.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]
+```
+
+---
+
+### F. GPU & AI / ML Inference (PyTorch / vLLM / CUDA)
+
+* **Model weights out of the container:** Never bake 10GB+ Hugging Face weights into the Docker image. Keep the image under 3GB with PyTorch and dependencies; mount weights from Cloud Storage FUSE at runtime (`HF_HOME=/mnt/models`).
+* **Pin CUDA version:** Use NVIDIA CUDA runtime base images compatible with Cloud Run NVIDIA L4 drivers (CUDA 12.1+).
+
+```dockerfile
+# Optimized GPU Inference Dockerfile for Cloud Run (NVIDIA L4)
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04 AS runtime
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    HF_HOME=/mnt/models \
+    PORT=8080
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+COPY app app/
+EXPOSE 8080
+CMD ["python3", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+```
+
+---
+
+### G. Static Assets & Reverse Proxy (Caddy / NGINX)
+
+* **Listen on non-privileged port:** Cloud Run routes to `$PORT` (default 8080). Do not run as root on port 80.
+* **Enable Gzip & Keepalives:** Use non-blocking event loops for high concurrency (`--concurrency=250`).
+
+```dockerfile
+# Minimal Caddy Reverse Proxy for Cloud Run
+FROM caddy:2-alpine
+COPY Caddyfile /etc/caddy/Caddyfile
+EXPOSE 8080
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+```
+

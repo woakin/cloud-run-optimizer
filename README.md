@@ -36,13 +36,23 @@ Or copy `skills/cloud-run-optimizer` directly into your project's `.agents/skill
 
 ## What This Skill Optimizes
 
-### 1. Workload-Aware Sizing & Concurrency (`references/workload-profiles.md`)
-Automatically classifies your project into one of 5 profiles before choosing `cpu`, `memory`, `concurrency`, and execution environment:
+### 1. Automated Workload Evaluation & Sizing (`references/workload-profiles.md`)
+Run the automated evaluator to inspect your repo and output a tailored sizing profile, deployment flags, or Knative YAML:
+```bash
+python3 skills/cloud-run-optimizer/scripts/evaluate-workload.py . --format terminal
+```
+
+Classifies your project into one of **10 specialized workload profiles**:
 * **Profile A — I/O-Bound Async APIs** (Go, Node.js, FastAPI/Uvicorn, Rust)
 * **Profile B — Sync / CPU-Bound APIs** (Django/Flask WSGI, Rails, PHP, PDF/Image processing)
 * **Profile C — Full-Stack SSR Web Apps** (Next.js Standalone, Nuxt, Remix, SvelteKit, Astro)
-* **Profile D — AI / LLM / Streaming** (Agentic backends, SSE, WebSockets, MCP servers)
+* **Profile D — AI Agent, LLM Gateway & Streaming** (LangChain, LlamaIndex, MCP servers, SSE token streaming)
 * **Profile E — Background Queues & Cron** (Migrating in-process pollers to Cloud Run Jobs, Cloud Tasks, or Worker Pools)
+* **Profile F — GPU & AI / ML Inference** (vLLM, Ollama, PyTorch, Whisper with NVIDIA L4 GPU & GCS FUSE model mounts)
+* **Profile G — Enterprise JVM & .NET** (Spring Boot, Quarkus, Micronaut, ASP.NET Core with cgroup memory limits)
+* **Profile H — High-Burst Event & Webhook Receivers** (Stripe, GitHub, Eventarc, Pub/Sub push with bounded concurrency)
+* **Profile I — Static SPA, Reverse Proxy & Edge Gateway** (NGINX, Caddy, Envoy, lightweight Go proxies)
+* **Profile J — Stateful WebSockets & Interactive Sessions** (Real-time collaboration, Yjs, terminal sessions with `--session-affinity`)
 
 ### 2. Serverless Code Anti-Pattern Detection (`references/code-antipatterns.md`)
 Detects and remediates code patterns that break or overbill on Cloud Run:
@@ -56,7 +66,7 @@ Detects and remediates code patterns that break or overbill on Cloud Run:
 ### 3. Container & Runtime Tuning (`references/dockerfile-runtime-tuning.md`)
 * Multi-stage Dockerfiles using `distroless`, `slim`, or `alpine` base images.
 * Exec-form `CMD` to preserve PID 1 signal forwarding.
-* Runtime flags tuned to container limits (`--max-old-space-size` for V8/Node.js, `output: 'standalone'` for Next.js, worker/thread formulas for Uvicorn/Gunicorn, `GOMEMLIMIT` for Go).
+* Runtime flags tuned to container limits (`--max-old-space-size` for Node.js, `output: 'standalone'` for Next.js, `-XX:MaxRAMPercentage=75.0` for JVM, CUDA 12 runtime recipes for GPUs, `GOMEMLIMIT` for Go).
 
 ### 4. Billing & Networking Cost Traps (`references/cost-and-networking.md`)
 * **Request-based (`--cpu-throttling`) vs. Instance-based billing.**
@@ -84,7 +94,8 @@ Detects and remediates code patterns that break or overbill on Cloud Run:
 
 ## Included Deterministic Scripts
 
-* `scripts/audit-codebase.sh`: Scans a local repository for Dockerfile inefficiencies, missing `.dockerignore`, in-process timers, memory sessions, and IaC misconfigurations.
+* `scripts/evaluate-workload.py`: Evaluates the local repository's dependencies, Dockerfile, and code patterns to classify the workload into one of 10 profiles and output tailored configurations (formats: `terminal`, `json`, `deploy-cmd`, `yaml`, `tf`).
+* `scripts/audit-codebase.sh`: Scans a local repository for Dockerfile inefficiencies, missing `.dockerignore`, in-process timers, memory sessions, IaC misconfigurations, and automatically runs the workload evaluator.
 * `scripts/audit-live-service.sh`: Inspects a live deployed Cloud Run service via `gcloud run services describe` and outputs prioritized cost and latency recommendations.
 
 ---
@@ -99,6 +110,7 @@ cloud-run-optimizer/
     └── cloud-run-optimizer/
         ├── SKILL.md
         ├── scripts/
+        │   ├── evaluate-workload.py
         │   ├── audit-codebase.sh
         │   └── audit-live-service.sh
         ├── references/
@@ -112,6 +124,8 @@ cloud-run-optimizer/
         └── examples/
             ├── service-io-bound.yaml
             ├── service-cpu-or-ssr.yaml
+            ├── service-gpu-inference.yaml
+            ├── service-jvm-enterprise.yaml
             └── main.tf
 ```
 

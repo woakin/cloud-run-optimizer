@@ -21,9 +21,13 @@ Follow this workflow whenever creating, migrating, or optimizing an application 
 
 ## Step 1: Audit Current State & Classify the Workload
 
-1. **If auditing an existing local repository**, run the static scanner first:
+1. **If auditing an existing local repository**, run the automated scanner and classifier:
    ```bash
+   # Runs code anti-pattern scan AND automated workload profile classification:
    bash ./scripts/audit-codebase.sh .
+   
+   # Or run the evaluator directly to output JSON, YAML, or deploy commands:
+   python3 ./scripts/evaluate-workload.py . --format terminal
    ```
 2. **If auditing a live deployed Cloud Run service** (and `gcloud` is authenticated), run:
    ```bash
@@ -34,12 +38,17 @@ Follow this workflow whenever creating, migrating, or optimizing an application 
    * **Cloud Run Job:** Scheduled tasks (cron), batch processing, DB migrations, or queue batches that run to completion and exit. Never run cron loops inside a Service.
    * **Cloud Run Worker Pool:** Continuous pull-based consumers (Kafka, RabbitMQ, NATS) with no HTTP endpoint.
 
-4. **Classify the Service into one of 5 Workload Profiles** (see [references/workload-profiles.md](./references/workload-profiles.md) for full sizing matrices):
-   * **Profile A — I/O-Bound Async API:** Go, Node.js (Express/Fastify/Nest), Python ASGI (FastAPI/Uvicorn), Rust.
+4. **Classify the Service into one of 10 Workload Profiles** (see [references/workload-profiles.md](./references/workload-profiles.md) for full sizing matrices):
+   * **Profile A — I/O-Bound Async API:** Go, Node.js (Express/Fastify/Hono), Python ASGI (FastAPI/Uvicorn), Rust.
    * **Profile B — Sync / CPU-Bound API:** Python WSGI (Django/Flask), Ruby/Rails, PHP, PDF/image/video processing.
    * **Profile C — Full-Stack SSR Web App:** Next.js, Nuxt, Remix, SvelteKit, Astro, Angular SSR.
    * **Profile D — AI / LLM / Streaming:** Agentic backends, LLM SSE streaming, WebSockets, MCP servers.
    * **Profile E — Background Queue / Cron:** Tasks triggered asynchronously via Cloud Tasks, Pub/Sub, or Cloud Scheduler.
+   * **Profile F — GPU & AI / ML Inference:** vLLM, Ollama, PyTorch, Whisper, Hugging Face TGI with NVIDIA L4 GPU.
+   * **Profile G — Enterprise JVM & Managed Runtimes:** Java (Spring Boot, Quarkus, Micronaut), Kotlin, ASP.NET Core.
+   * **Profile H — High-Burst Event & Webhook Receivers:** Stripe, GitHub, Eventarc, Pub/Sub push.
+   * **Profile I — Static SPA, Reverse Proxy & Edge Gateway:** NGINX, Caddy, Envoy, lightweight Go forwarders.
+   * **Profile J — Stateful WebSockets & Interactive Sessions:** Real-time multiplayer, Yjs collaborative editing, terminal sessions.
 
 ---
 
@@ -96,7 +105,7 @@ Select the exact flags for `gcloud run deploy`, Knative YAML (`examples/`), or T
 When presenting your optimization or deployment configuration to the user:
 1. **Report detected bottlenecks:** Summarize any code anti-patterns, Dockerfile issues, or suboptimal Cloud Run flags found.
 2. **State the selected Workload Profile:** Explain *why* the chosen `cpu`, `memory`, `concurrency`, and billing model fit their stack.
-3. **Provide ready-to-apply artifacts:** Output the exact `gcloud run deploy` command, Knative `service.yaml` (based on [examples/service-io-bound.yaml](./examples/service-io-bound.yaml) or [examples/service-cpu-or-ssr.yaml](./examples/service-cpu-or-ssr.yaml)), or Terraform block ([examples/main.tf](./examples/main.tf)).
+3. **Provide ready-to-apply artifacts:** Output the exact `gcloud run deploy` command, Knative `service.yaml` (see templates in [examples/](./examples/): [service-io-bound.yaml](./examples/service-io-bound.yaml), [service-cpu-or-ssr.yaml](./examples/service-cpu-or-ssr.yaml), [service-gpu-inference.yaml](./examples/service-gpu-inference.yaml), or [service-jvm-enterprise.yaml](./examples/service-jvm-enterprise.yaml)), or Terraform block ([examples/main.tf](./examples/main.tf)).
 4. **Verify after deployment (if applicable):** Follow [references/observability-metrics.md](./references/observability-metrics.md) to check CPU p95, memory p99, and triage logs:
    ```bash
    gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=<SERVICE_NAME> AND severity>=WARNING" --limit=20
