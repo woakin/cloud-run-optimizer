@@ -14,11 +14,13 @@ spec:
       annotations:
         # 1. GPU workloads require always-allocated CPU (no cpu throttling)
         run.googleapis.com/cpu-throttling: "false"
-        # 2. Gen2 execution environment is mandatory for GPU workloads
+        # 2. Gen2 execution environment is mandatory for GPU & GCS FUSE workloads
         run.googleapis.com/execution-environment: gen2
-        # 3. Specify NVIDIA L4 GPU accelerator
+        # 3. Specify NVIDIA L4 GPU accelerator (24GB VRAM; requires >= 4 vCPU, >= 16Gi RAM)
         run.googleapis.com/gpu-type: nvidia-l4
-        # 4. Scale to zero when idle, cap max instances to control GPU cost
+        # 4. Disable GPU zonal redundancy to cut hourly GPU cost by ~30-38% and halve quota needs
+        run.googleapis.com/gpu-zonal-redundancy-disabled: "true"
+        # 5. Scale to zero when idle, cap max instances to control GPU cost
         autoscaling.knative.dev/minScale: "0"
         autoscaling.knative.dev/maxScale: "3"
     spec:
@@ -27,13 +29,16 @@ spec:
       timeoutSeconds: 600
       serviceAccountName: ml-inference-sa@PROJECT_ID.iam.gserviceaccount.com
       volumes:
-        # Mount Cloud Storage bucket containing model weights to avoid multi-GB container pulls
+        # Mount Cloud Storage bucket containing model weights to avoid multi-GB container pulls.
+        # NOTE: Avoid setting large 'file-cache:max-size-mb' in mountOptions because local
+        # disk on Cloud Run is backed by container RAM (tmpfs) and will trigger OOM kills.
         - name: model-weights
           csi:
             driver: gcsfuse.run.googleapis.com
+            readOnly: true
             volumeAttributes:
               bucketName: my-model-weights-bucket
-              mountOptions: "implicit-dirs,file-cache:max-size-mb:10000"
+              mountOptions: "implicit-dirs"
       containers:
         - image: us-central1-docker.pkg.dev/PROJECT_ID/models/vllm-service:latest
           ports:

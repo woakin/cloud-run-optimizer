@@ -69,6 +69,18 @@ if [ -f "Dockerfile" ]; then
   if grep -E '^[[:space:]]*(CMD|ENTRYPOINT)[[:space:]]+[^[]' Dockerfile >/dev/null 2>&1; then
     echo "  [WARN] Shell-form CMD/ENTRYPOINT detected in Dockerfile. Use exec form 'CMD [\"executable\", \"arg\"]' so SIGTERM reaches your process during Cloud Run scale-down."
   fi
+
+  if [ -f "package.json" ] && ! grep -q "max-old-space-size" Dockerfile 2>/dev/null; then
+    echo "  [INFO] Node.js Dockerfile missing 'NODE_OPTIONS=--max-old-space-size=...'. Cap V8 heap at ~75% of container memory to prevent silent OOM kills."
+  fi
+
+  if ( [ -f "pom.xml" ] || [ -f "build.gradle" ] || [ -f "build.gradle.kts" ] ) && ! grep -q "MaxRAMPercentage" Dockerfile 2>/dev/null; then
+    echo "  [WARN] Java/JVM Dockerfile missing '-XX:MaxRAMPercentage=75.0'. JVM may exceed Cloud Run cgroup memory limit and crash with OOM (exit code 137)."
+  fi
+
+  if grep -iE '(npm[[:space:]]+run[[:space:]]+dev|yarn[[:space:]]+dev|pnpm[[:space:]]+dev|next[[:space:]]+dev|--reload)' Dockerfile >/dev/null 2>&1; then
+    echo "  [WARN] Development server command ('npm run dev' / '--reload') detected in Dockerfile! Always run a production build ('npm run build' + 'npm start' / 'node server.js') on Cloud Run."
+  fi
 else
   echo "  - Dockerfile: NOT FOUND (Will rely on Cloud Buildpacks if deploying from source)."
 fi
@@ -112,7 +124,9 @@ EXCLUDE_DIRS=(
   --exclude-dir=.claude
   --exclude="*.md"
   --exclude="audit-codebase.sh"
+  --exclude="audit-live-service.sh"
   --exclude="evaluate-workload.py"
+  --exclude="platform-limits.json"
 )
 
 scan_pattern() {
@@ -127,6 +141,16 @@ scan_pattern() {
     echo "$hits" | sed 's/^/           -> /'
   fi
 }
+
+scan_pattern \
+  "SQLite / Local File Database Detected (CRITICAL DATA LOSS RISK)" \
+  "(better-sqlite3|sqlite3\.connect|sqlite:///|provider[[:space:]]*=[[:space:]]*['\"]sqlite['\"]|file:\./.*\.db)" \
+  "Cloud Run containers are stateless—local SQLite files are permanently wiped every time the container restarts or scales to zero! Switch to Cloud SQL, Firestore, Supabase, or Neon."
+
+scan_pattern \
+  "Hardcoded Dev Port (3000 / 5000 / 8000) Without \$PORT" \
+  "\.(listen|run)\([[:space:]]*(3000|5000|8000)[[:space:],)]" \
+  "Cloud Run injects PORT=8080 dynamically. Always read process.env.PORT || 8080 (Node) or os.environ.get('PORT', 8080) (Python) and bind to 0.0.0.0."
 
 scan_pattern \
   "In-Process Timers / Cron Detected" \

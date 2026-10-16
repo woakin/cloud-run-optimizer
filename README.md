@@ -92,11 +92,12 @@ Detects and remediates code patterns that break or overbill on Cloud Run:
 
 ---
 
-## Included Deterministic Scripts
+## Included Deterministic Scripts & Adaptive Limits
 
-* `scripts/evaluate-workload.py`: Evaluates the local repository's dependencies, Dockerfile, and code patterns to classify the workload into one of 10 profiles and output tailored configurations (formats: `terminal`, `json`, `deploy-cmd`, `yaml`, `tf`).
+* `scripts/evaluate-workload.py`: Evaluates the local repository's dependencies, Dockerfile, and code patterns to classify the workload into one of 10 profiles and output tailored configurations (formats: `terminal`, `json`, `deploy-cmd`, `yaml`, `tf`). Dynamically loads constraints from `scripts/platform-limits.json` and probes the local `gcloud` CLI to adapt GA vs. `beta` flags automatically.
+* `scripts/platform-limits.json`: Externalized GCP platform constraints (execution environment minimums, fractional CPU rules, GPU SKU floors, and Cloud SQL connection defaults) so limits can be updated without modifying code.
 * `scripts/audit-codebase.sh`: Scans a local repository for Dockerfile inefficiencies, missing `.dockerignore`, in-process timers, memory sessions, IaC misconfigurations, and automatically runs the workload evaluator.
-* `scripts/audit-live-service.sh`: Inspects a live deployed Cloud Run service via `gcloud run services describe` and outputs prioritized cost and latency recommendations.
+* `scripts/audit-live-service.sh`: Inspects a live deployed Cloud Run service via `gcloud run services describe` AND automatically introspects any attached Cloud SQL instances (`gcloud sql instances describe`) to check region co-location, Private IP availability, machine tier, and exact per-container connection pool limits.
 
 ---
 
@@ -111,6 +112,7 @@ cloud-run-optimizer/
         ├── SKILL.md
         ├── scripts/
         │   ├── evaluate-workload.py
+        │   ├── platform-limits.json
         │   ├── audit-codebase.sh
         │   └── audit-live-service.sh
         ├── references/

@@ -1,0 +1,57 @@
+{
+  "schema_version": "2026.10",
+  "description": "Externalized GCP Cloud Run & Cloud SQL platform constraints and SKU defaults. Update this file as Google Cloud introduces new hardware SKUs or relaxes execution environment limits.",
+  "execution_environments": {
+    "gen1": {
+      "min_cpu": 0.08,
+      "max_cpu": 8,
+      "min_memory_mb": 128,
+      "supports_fractional_cpu": true,
+      "supports_gcs_fuse": false,
+      "supports_gpu": false
+    },
+    "gen2": {
+      "min_cpu": 1.0,
+      "max_cpu": 8,
+      "min_memory_mb": 512,
+      "supports_fractional_cpu": false,
+      "supports_gcs_fuse": true,
+      "supports_gpu": true
+    }
+  },
+  "concurrency_rules": {
+    "fractional_cpu_max_concurrency": 1,
+    "standard_max_concurrency": 1000,
+    "max_timeout_seconds_service": 3600,
+    "max_timeout_seconds_job": 86400
+  },
+  "gpu_skus": {
+    "nvidia-l4": {
+      "vram_gb": 24,
+      "min_cpu": 4,
+      "recommended_cpu": 8,
+      "min_memory_gi": 16,
+      "recommended_memory_gi": 32,
+      "requires_gen2": true,
+      "requires_no_cpu_throttling": true,
+      "supports_no_zonal_redundancy": true
+    }
+  },
+  "cloud_sql_default_max_connections": {
+    "db-f1-micro": 25,
+    "db-g1-small": 50,
+    "ram_lt_4gb": 100,
+    "ram_4gb_to_8gb": 200,
+    "ram_8gb_to_16gb": 400,
+    "ram_16gb_to_32gb": 800,
+    "ram_gt_32gb": 1000
+  },
+  "tier_1_pricing_regions": [
+    "us-central1",
+    "us-east1",
+    "us-west1",
+    "europe-west1",
+    "europe-west4",
+    "asia-east1"
+  ]
+}

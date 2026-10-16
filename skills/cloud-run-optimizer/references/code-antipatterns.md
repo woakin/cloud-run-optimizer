@@ -1,6 +1,6 @@
 # Cloud Run Code Anti-Patterns & Serverless Remediations
 
-When generating or reviewing application code for Cloud Run, eliminate these 7 anti-patterns that break horizontal scaling, cause silent failures, or inflate monthly bills.
+When generating or reviewing application code for Cloud Run, eliminate these 8 anti-patterns that break horizontal scaling, cause silent failures or data loss, or inflate monthly bills.
 
 ---
 
@@ -106,10 +106,33 @@ When Cloud Run scales down an instance or deploys a new revision, it sends `SIGT
 
 ---
 
-## 7. Hardcoded Host (`127.0.0.1`) or Port
+## 7. Hardcoded Host (`127.0.0.1`) or Dev Port (`3000` / `5000`)
 
 ### Why it fails on Cloud Run
-Cloud Run's ingress proxy routes traffic into the container over a virtual network interface on the port injected via `$PORT` (default `8080`). Binding to `localhost` or `127.0.0.1` causes the startup probe to fail with `The user-provided container failed to start and listen on the port defined provided by the PORT=8080 environment variable`.
+Cloud Run's ingress proxy routes traffic into the container over a virtual network interface on the port injected via `$PORT` (default `8080`). Binding to `localhost` / `127.0.0.1` or hardcoding `app.listen(3000)` causes the startup probe to fail with `The user-provided container failed to start and listen on the port defined provided by the PORT=8080 environment variable`.
 
 ### Optimized Pattern
-Always bind to `0.0.0.0` and read `process.env.PORT || 8080` (or `os.environ.get("PORT", "8080")`).
+Always bind to `0.0.0.0` and read `process.env.PORT || 8080` (or `int(os.environ.get("PORT", 8080))`):
+```javascript
+// Node.js / Express / Fastify
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server listening on port ${PORT}`);
+});
+```
+
+---
+
+## 8. Local SQLite Databases (`better-sqlite3`, `sqlite3`, Prisma `file:./dev.db`)
+
+### Why it fails on Cloud Run (Permanent Data Loss)
+Many AI-generated or prototype apps default to a local SQLite file (`dev.db`, `database.sqlite`, Prisma `provider = "sqlite"`). On Cloud Run:
+1. **Total Data Wipe on Scale-to-Zero:** Every container has an ephemeral in-memory filesystem. As soon as traffic stops for ~15 minutes and the container scales to zero (or when you deploy a new version), **your entire SQLite database file is permanently deleted**.
+2. **Split-Brain Corruption:** If traffic spikes and Cloud Run spins up 2+ containers, each container gets its own isolated copy of the SQLite file—users will see different data depending on which container handles their request.
+
+### Optimized Pattern
+* **Option A (Managed Postgres / MySQL):** Switch to **Cloud SQL** (see [cloud-sql.md](./cloud-sql.md)) or a serverless Postgres provider with a free tier (**Neon** or **Supabase**) and change Prisma/Drizzle/SQLAlchemy to `postgresql`.
+* **Option B (Keep SQLite syntax with Turso / libSQL):** If you want to keep SQLite queries with zero schema changes, point your client to a remote **Turso (`@libsql/client`)** URL instead of a local `file:` path.
+* **Option C (NoSQL):** Use **Google Cloud Firestore** (generous free tier, zero connection pooling headaches, native IAM auth).
+* **Option D (Single-Instance Litestream / GCS FUSE):** Only if strictly required for a single-writer hobby app, set `--max-instances=1` and stream WAL changes to a **Cloud Storage (GCS)** bucket using **Litestream**.
+
