@@ -56,6 +56,9 @@ exec_env = meta_ann.get("run.googleapis.com/execution-environment", "default (ge
 vpc_connector = meta_ann.get("run.googleapis.com/vpc-access-connector", "")
 vpc_egress = meta_ann.get("run.googleapis.com/vpc-access-egress", "")
 network_interfaces = meta_ann.get("run.googleapis.com/network-interfaces", "")
+cloud_sql_instances = meta_ann.get("run.googleapis.com/cloudsql-instances", "")
+startup_probe = c0.get("startupProbe", None)
+liveness_probe = c0.get("livenessProbe", None)
 
 print(f"\n[Current Configuration]")
 print(f"  - Image:                 {c0.get(\"image\", \"unknown\")}")
@@ -64,13 +67,21 @@ print(f"  - Concurrency:           {concurrency}")
 print(f"  - Min / Max Instances:   {min_scale} / {max_scale}")
 print(f"  - CPU Throttling:        {cpu_throttling} ({\"Request-based billing\" if cpu_throttling == \"true\" else \"Instance-based 24/7 billing\"})")
 print(f"  - Startup CPU Boost:     {cpu_boost}")
+print(f"  - Startup Probe:         {\"Configured\" if startup_probe else \"None (default 4s HTTP wait)\"}")
+print(f"  - Liveness Probe:        {\"Configured\" if liveness_probe else \"None\"}")
 print(f"  - Execution Environment: {exec_env}")
 print(f"  - Request Timeout:       {timeout}s")
+print(f"  - Cloud SQL Instances:   {cloud_sql_instances or \"None\"}")
 print(f"  - VPC Connector:         {vpc_connector or \"None\"}")
 print(f"  - Direct VPC Network:    {\"Configured\" if network_interfaces else \"None\"} (egress: {vpc_egress or \"N/A\"})")
 
 print(f"\n[Optimization Findings]")
 findings = 0
+
+if cloud_sql_instances:
+    findings += 1
+    print(f"  * [DATABASE SIZING] Cloud SQL instances configured ({cloud_sql_instances}).")
+    print(f"     -> Action: Verify that container pool_size * max_scale ({max_scale}) <= DB max_connections * 0.8 to avoid crashing Cloud SQL during traffic spikes (see references/cloud-sql.md).")
 
 if cpu_boost.lower() != "true":
     findings += 1

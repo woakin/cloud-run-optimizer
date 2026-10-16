@@ -151,6 +151,11 @@ scan_pattern \
   "(new Worker\(|celery\.worker|Sidekiq|BasicConsume)" \
   "Pull-based queue workers inside HTTP Services prevent scale-to-zero. Use Cloud Tasks HTTP push, Pub/Sub push, or Cloud Run Worker Pools."
 
+scan_pattern \
+  "Unbounded or Large Database Pool Detected" \
+  "(pool_size[[:space:]]*=[[:space:]]*[2-9][0-9]|connection_limit[[:space:]]*=[[:space:]]*[2-9][0-9]|max:[[:space:]]*[2-9][0-9])" \
+  "Large database pool size detected. Ensure pool size per instance is bounded and coupled to --max-instances to prevent Cloud SQL connection starvation (see references/cloud-sql.md)."
+
 # Check SIGTERM handling
 SIGTERM_HITS=$(grep -rnI "${EXCLUDE_DIRS[@]}" -E "SIGTERM" . 2>/dev/null | head -n 3 || true)
 if [ -z "$SIGTERM_HITS" ]; then

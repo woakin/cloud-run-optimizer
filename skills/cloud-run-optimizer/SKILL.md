@@ -53,8 +53,9 @@ Before deploying or generating infrastructure configs, verify the application co
 4. **Ephemeral `/tmp` Is In-Memory (`tmpfs`):** Writing files to `/tmp` consumes the container's memory limit and causes OOM crashes if not deleted. Always delete temporary files in a `finally` block, or stream uploads/downloads directly to **Cloud Storage (GCS)** using Signed URLs.
 5. **Stateless Memory:** Never store user sessions, rate-limit counters, or upload state in process memory. Use **Firestore**, **Memorystore (Valkey/Redis)**, or signed cookies/JWTs.
 6. **Graceful Shutdown (`SIGTERM`):** Cloud Run sends `SIGTERM` and gives **10 seconds** before `SIGKILL`. Register a `SIGTERM` handler to stop accepting new requests, finish in-flight requests, and close DB pools cleanly.
-7. **Global Connection Pools & Concurrency Caps:** Initialize DB/HTTP clients at module scope (outside request handlers) so warm instances reuse connections. Bound per-instance pool size using:
+7. **Global Connection Pools & Cloud SQL Limits:** Initialize DB/HTTP clients at module scope (outside request handlers) so warm instances reuse connections. Enforce Cloud SQL connection limits and sizing formulas (see [references/cloud-sql.md](./references/cloud-sql.md)) using:
    $$\text{pool\_size} \le \left\lfloor \frac{\text{DB\_MAX\_CONNECTIONS} \times 0.8}{\text{max\_instances}} \right\rfloor$$
+   Never run synchronous database queries in health/startup probes or block container boot on DB connection establishment.
 
 ---
 
@@ -86,6 +87,7 @@ Select the exact flags for `gcloud run deploy`, Knative YAML (`examples/`), or T
 | **Max Instances** | `--max-instances` | Always set a sensible ceiling (e.g., `10–50`) to prevent runaway cost spikes and protect downstream databases from connection exhaustion. |
 | **Execution Env** | `--execution-environment=gen2` | Use `gen2` for CPU-intensive workloads, network file systems (GCS FUSE / Filestore), or faster Linux syscall performance. Default or `gen1` is fine for lightweight I/O APIs with ultra-fast sub-second cold starts. |
 | **VPC Egress** | `--network` & `--subnet` | **Use Direct VPC Egress** instead of Serverless VPC Access Connectors. Connectors run always-on e2/f1 VMs that cost \$15–\$35+/month even when your service scales to zero. |
+| **Startup Probes** | `startupProbe` / `livenessProbe` | Configure for runtimes taking >2s to boot (see [references/health-probes.md](./references/health-probes.md)). Never query external databases in probes. |
 
 ---
 
@@ -95,7 +97,7 @@ When presenting your optimization or deployment configuration to the user:
 1. **Report detected bottlenecks:** Summarize any code anti-patterns, Dockerfile issues, or suboptimal Cloud Run flags found.
 2. **State the selected Workload Profile:** Explain *why* the chosen `cpu`, `memory`, `concurrency`, and billing model fit their stack.
 3. **Provide ready-to-apply artifacts:** Output the exact `gcloud run deploy` command, Knative `service.yaml` (based on [examples/service-io-bound.yaml](./examples/service-io-bound.yaml) or [examples/service-cpu-or-ssr.yaml](./examples/service-cpu-or-ssr.yaml)), or Terraform block ([examples/main.tf](./examples/main.tf)).
-4. **Verify after deployment (if applicable):** Check container startup latency and memory p95 in Cloud Logging / Monitoring:
+4. **Verify after deployment (if applicable):** Follow [references/observability-metrics.md](./references/observability-metrics.md) to check CPU p95, memory p99, and triage logs:
    ```bash
    gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=<SERVICE_NAME> AND severity>=WARNING" --limit=20
    ```
