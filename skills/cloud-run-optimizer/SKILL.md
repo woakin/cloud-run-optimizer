@@ -1,16 +1,17 @@
 ---
 name: cloud-run-optimizer
 description: >-
-  Audits, configures, and optimizes Google Cloud Run services, jobs, and worker pools
-  for maximum performance, low cold-start latency, and minimal cost. Use whenever
-  generating, migrating, reviewing, or deploying applications to Google Cloud Run,
-  writing Dockerfiles for Cloud Run, tuning concurrency/CPU/memory/autoscaling flags,
-  or troubleshooting high Cloud Run bills and latency.
+  Audits, configures, deploys, and optimizes applications on Google Cloud (GCP),
+  Cloud Run (services, jobs, worker pools), and Cloud SQL for maximum performance,
+  low cold-start latency, and minimal cost ($0 idle). Use whenever a user asks to
+  deploy an app to Google Cloud / GCP, configure or optimize Cloud Run or Cloud SQL,
+  write Dockerfiles for GCP, tune concurrency/CPU/memory/autoscaling/GPU flags,
+  fix database connection exhaustion, or lower their Google Cloud bill.
 license: Apache-2.0
 metadata:
   category: cloud-infrastructure
   platform: google-cloud-run
-  version: "1.0.0"
+  version: "1.1.0"
 ---
 
 # Google Cloud Run Performance & Cost Optimizer
