@@ -41,6 +41,7 @@ When you ask a standard LLM *"Deploy my app to Cloud Run"*, it guesses generic f
 | **Next.js / Nuxt / Remix SSR** | Ships `1.4 GB` container running `npm run dev` on port `3000` | Configures `output: 'standalone'`, `node:22-slim`, `0.0.0.0:$PORT`, `2 vCPU / 1Gi`, and `--max-old-space-size=768` | **70% smaller image & 3x faster cold starts** |
 | **Cloud SQL (Postgres / MySQL)** | Default pool (`10` conns) × `100` max instances = **1,000 connections** | Inspects your live Cloud SQL tier & calculates exact safe `pool_size` + `--max-instances` cap | **Zero `FATAL: too many clients` outages** |
 | **Private VPC Networking** | Creates a legacy Serverless VPC Access Connector | Configures **Direct VPC Egress** (`--network` & `--subnet`) | **Saves $15–$35+/mo in idle VM charges** |
+| **Hidden GCP Storage & IP Taxes** | Leaves Cloud SQL Public IPv4 enabled + lets `cloud-run-source-deploy` accumulate 80+ GB of old build images | Disables unneeded Public IPv4 (`--no-assign-ip`), trims backups to the 7 free tier, and attaches an **Artifact Registry cleanup policy** | **Saves $10–$25+/mo in silent recurring fees** |
 | **GPU Inference (vLLM / Ollama)** | Multi-zone GPU defaults + caches weights in `/tmp` (causes RAM OOM) | Enforces `nvidia-l4` (`4 vCPU / 16Gi`), `--no-gpu-zonal-redundancy`, and GCS FUSE volume mounts | **~35% cheaper GPU/hr & zero OOM crashes** |
 
 ---

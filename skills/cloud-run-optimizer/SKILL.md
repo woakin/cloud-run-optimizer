@@ -11,7 +11,7 @@ license: Apache-2.0
 metadata:
   category: cloud-infrastructure
   platform: google-cloud-run
-  version: "1.1.0"
+  version: "1.2.0"
 ---
 
 # Google Cloud Run Performance & Cost Optimizer
@@ -107,6 +107,8 @@ Select the exact flags for `gcloud run deploy`, Knative YAML (`examples/`), or T
 | **Max Instances** | `--max-instances` | Always set a sensible ceiling (e.g., `5–30`) to prevent runaway cost spikes and protect downstream databases from connection exhaustion. |
 | **Execution Env** | `--execution-environment=gen2` | Use `gen2` for CPU-intensive workloads, network file systems (GCS FUSE / Filestore), or faster Linux syscall performance (requires `>= 1 vCPU` and `>= 512Mi` memory). Use `gen1` for sub-1-vCPU microservices. |
 | **VPC Egress** | `--network` & `--subnet` | **Use Direct VPC Egress** instead of Serverless VPC Access Connectors. Connectors run always-on e2/f1 VMs that cost \$15–\$35+/month even when your service scales to zero. |
+| **Cloud SQL FinOps** | `--no-assign-ip` & `--retained-backups-count=7` | When connecting via Private IP + Direct VPC, disable Cloud SQL Public IPv4 (`--no-assign-ip`) to save **~\$7.30/mo** (`\$0.01/hr` idle IP tax) and cap automated backups at `7` (only 7 are free). |
+| **Artifact Registry** | `set-cleanup-policies` (`--no-dry-run`) | Always attach a `keep-recent-3` + `delete-old-images` cleanup policy to `cloud-run-source-deploy` and custom repos so old container layers don't silently accumulate (\$0.10/GB/mo). |
 | **Startup Probes** | `startupProbe` / `livenessProbe` | Configure for runtimes taking >2s to boot (see [references/health-probes.md](./references/health-probes.md)). Never query external databases in probes. |
 
 ---
