@@ -54,5 +54,30 @@ Before setting `--min-instances=1` (which adds ~\$10–\$55+/month per instance 
 
 ---
 
-## 4. Committed Use Discounts (CUDs)
-* For mature workloads with predictable baseline spend Across Cloud Run Services, Jobs, and Worker Pools, Google Cloud **Compute Flexible CUDs** (1-year or 3-year) apply automatically to Cloud Run vCPU and memory usage, reducing compute bills by **17% to 46%** without locking you into a single region or machine family.
+## 4. Artifact Registry & Cloud SQL Hidden Storage / IP Traps
+
+### A. Artifact Registry Image Bloat (`$0.10/GB/month`)
+* **The Trap:** Every `gcloud run deploy --source=.` or Cloud Build execution pushes a new multi-hundred-MB Docker image to Artifact Registry (`cloud-run-source-deploy`). Over time, hundreds of untagged or old historical images accumulate (often reaching 50–150+ GB = **\$5–\$15+/month** in pure dead storage).
+* **The Fix:** Always attach an automated **Artifact Registry Cleanup Policy** (`--no-dry-run`) to keep the 3 most recent images and delete historical images older than 3–7 days:
+  ```bash
+  cat << 'EOF' > /tmp/cleanup-policy.json
+  [
+    {"name": "delete-old", "action": {"type": "Delete"}, "condition": {"olderThan": "3d", "tagState": "ANY"}},
+    {"name": "keep-recent-3", "action": {"type": "Keep"}, "mostRecentVersions": {"keepCount": 3}}
+  ]
+  EOF
+  gcloud artifacts repositories set-cleanup-policies cloud-run-source-deploy \
+    --location=us-central1 --policy=/tmp/cleanup-policy.json --no-dry-run
+  ```
+
+### B. Cloud SQL Public IPv4 Address Fee (`~$7.30/month`) & Extra Backups
+* **Public IPv4 Idle Tax:** Google Cloud SQL bills **\$0.01/hour (~\$7.30/month)** for an attached Public IPv4 address (`ipv4Enabled: true`), which nearly doubles the cost of a `db-f1-micro` instance. Once Cloud Run is connected to Cloud SQL via **Direct VPC Egress + Private IP**, disable the Public IPv4 address:
+  ```bash
+  gcloud sql instances patch <INSTANCE_NAME> --no-assign-ip
+  ```
+* **Backup Retention Limit:** Cloud SQL includes **7 automated backups** for free. Retaining 30 backups bills extra storage for backups 8–30. Set `--retained-backups-count=7` and `--retained-transaction-log-days=3`.
+
+---
+
+## 5. Committed Use Discounts (CUDs)
+* For mature workloads with predictable baseline spend across Cloud Run Services, Jobs, and Worker Pools, Google Cloud **Compute Flexible CUDs** (1-year or 3-year) apply automatically to Cloud Run vCPU and memory usage, reducing compute bills by **17% to 46%** without locking you into a single region or machine family.
